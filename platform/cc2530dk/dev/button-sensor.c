@@ -87,7 +87,7 @@ configure_b1(int type, int value)
 /*---------------------------------------------------------------------------*/
 /* Button 2 - cc2531 USb Dongle only */
 /*---------------------------------------------------------------------------*/
-#if MODEL_CC2531
+#if MODEL_CC2531 || MODEL_ZB502
 static int
 value_b2(int type)
 {
@@ -111,6 +111,9 @@ configure_b2(int type, int value)
 {
   switch(type) {
   case SENSORS_HW_INIT:
+#if MODEL_ZB502
+    P2INP |= 0x80; /* Pulldown */
+#endif
     BUTTON_IRQ_ON_PRESS(2);
     BUTTON_FUNC_GPIO(2);
     BUTTON_DIR_INPUT(2);
@@ -170,6 +173,48 @@ port_1_isr(void) __interrupt(P1INT_VECTOR)
   ENERGEST_OFF(ENERGEST_TYPE_IRQ);
   EA = 1;
 }
+#elif MODEL_ZB502
+void
+port_0_isr(void) __interrupt(P0INT_VECTOR)
+{
+  EA = 0;
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
+  /* This ISR is for the entire port. Check if the interrupt was caused by our
+   * button's pin. */
+  if(BUTTON_IRQ_CHECK(1)) {
+    if(timer_expired(&debouncetimer)) {
+      timer_set(&debouncetimer, CLOCK_SECOND / 8);
+      sensors_changed(&button_sensor);
+    }
+  }
+
+  BUTTON_IRQ_FLAG_OFF(1);
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
+  EA = 1;
+}
+/*---------------------------------------------------------------------------*/
+void
+port_2_isr(void) __interrupt(P2INT_VECTOR)
+{
+  EA = 0;
+  ENERGEST_ON(ENERGEST_TYPE_IRQ);
+
+  /* This ISR is for the entire port. Check if the interrupt was caused by our
+   * button's pin. */
+  if(BUTTON_IRQ_CHECK(2)) {
+    if(timer_expired(&debouncetimer)) {
+      timer_set(&debouncetimer, CLOCK_SECOND / 8);
+      sensors_changed(&button_2_sensor);
+    }
+  }
+
+  BUTTON_IRQ_FLAG_OFF(2);
+
+  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
+  EA = 1;
+}
 #else
 void
 port_0_isr(void) __interrupt(P0INT_VECTOR)
@@ -195,6 +240,6 @@ port_0_isr(void) __interrupt(P0INT_VECTOR)
 #pragma restore
 /*---------------------------------------------------------------------------*/
 SENSORS_SENSOR(button_1_sensor, BUTTON_SENSOR, value_b1, configure_b1, status_b1);
-#if MODEL_CC2531
+#if MODEL_CC2531 || MODEL_ZB502
 SENSORS_SENSOR(button_2_sensor, BUTTON_SENSOR, value_b2, configure_b2, status_b2);
 #endif

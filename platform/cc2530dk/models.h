@@ -93,6 +93,22 @@
 /* P0DIR and P0SEL masks */
 #define LED2_MASK  0x01
 #define LED1_MASK  0x02
+
+#elif MODEL_ZB502
+#define MODEL_STRING "Waveshare ZB502\n"
+#define LEDS_GREEN    1
+#define LEDS_RED      2
+
+/* H/W Connections */
+#define LED1_PIN   P1_0
+#define LED2_PIN   P1_1
+#define LED3_PIN   P1_4
+
+/* P0DIR and P0SEL masks */
+#define LED1_MASK  0x01
+#define LED2_MASK  0x02
+#define LED3_MASK  0x10
+#define LED4_MASK  0x02
 #else
 #define MODEL_STRING "TI SmartRF05 EB\n"
 #define LEDS_GREEN    1
