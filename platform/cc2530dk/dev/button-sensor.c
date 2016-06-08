@@ -44,7 +44,12 @@ static int
 value_b1(int type)
 {
   type;
+#if MODEL_ZB502
+  return !BUTTON_READ(1) || !timer_expired(&debouncetimer);
+#else
   return BUTTON_READ(1) || !timer_expired(&debouncetimer);
+#endif
+
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -66,7 +71,11 @@ configure_b1(int type, int value)
 #if !MODEL_CC2531
     P0INP |= 2; /* Tri-state */
 #endif
+#if MODEL_ZB502
+    BUTTON_IRQ_ON_RELEASE(1);
+#else
     BUTTON_IRQ_ON_PRESS(1);
+#endif
     BUTTON_FUNC_GPIO(1);
     BUTTON_DIR_INPUT(1);
     return 1;
