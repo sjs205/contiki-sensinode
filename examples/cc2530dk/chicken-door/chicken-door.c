@@ -65,7 +65,11 @@
 #include "dev/leds.h"
 
 #include "dev/button-sensor.h"
+
+#define ADC_SENSORS_ON 0
+#if ADC_SENSORS_ON
 #include "dev/adc-sensor.h"
+#endif
 
 #include "door.h"
 
@@ -82,8 +86,12 @@
 #endif /* DEBUG */
 /*---------------------------------------------------------------------------*/
 PROCESS(ctrl_buttons_process, "Control Buttons Process");
+#if ADC_SENSORS_ON
 PROCESS(sensors_test_process, "Sensor Test Process");
 AUTOSTART_PROCESSES(&ctrl_buttons_process, &sensors_test_process);
+#else
+AUTOSTART_PROCESSES(&ctrl_buttons_process);
+#endif
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(ctrl_buttons_process, ev, data)
 {
@@ -91,24 +99,42 @@ PROCESS_THREAD(ctrl_buttons_process, ev, data)
 
   PROCESS_BEGIN();
 
+  door_init();
+
   while(1) {
 
     PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event);
 
     /* If we woke up after a sensor event, inform what happened */
     sensor = (struct sensors_sensor *)data;
+    if(sensor == &button_1_sensor) {
+      PRINTF("Button 1 Press\n");
+      leds_toggle(LEDS_GREEN);
 
-    if(sensor == &button_sensor) {
-      PRINTF("Up Button Press\n");
+      door_open();
+      while (button_1_sensor.value(0)) {
+        PRINTF("Door opening\n");
+        watchdog_periodic();
+      }
+      door_stop();
     }
 
     if(sensor == &button_2_sensor) {
-      PRINTF("Down Button Press\n");
+      PRINTF("Button 2 Press\n");
+      leds_toggle(LEDS_RED);
+
+      door_close();
+      while (button_2_sensor.value(0)) {
+        PRINTF("Door closing\n");
+        watchdog_periodic();
+      }
+      door_stop();
     }
   }
 
   PROCESS_END();
 }
+#if ADC_SENSORS_ON
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(sensors_test_process, ev, data)
 {
@@ -142,15 +168,6 @@ PROCESS_THREAD(sensors_test_process, ev, data)
     if(sensor) {
       PRINTF("------------------\n");
 
-      leds_on(LEDS_RED);
-      leds_on(LEDS_GREEN);
-
-#ifdef MODEL_ZB502  
-        PRINTF("ZB502 Support enabled\n");
-#endif
-#ifdef BUTTON_SENSOR_ON
-        PRINTF("BUTTON_SENSOR_ON\n");
-#endif
       /*
        * Temperature:
        * Using 1.25V ref. voltage (1250mV).
@@ -202,4 +219,5 @@ PROCESS_THREAD(sensors_test_process, ev, data)
   }
   PROCESS_END();
 }
+#endif
 /*---------------------------------------------------------------------------*/

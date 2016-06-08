@@ -76,7 +76,7 @@ door_state get_door_state()
 door_state set_door_state(door_state state)
 {
   
-  door_state current_state = get_door_State();
+  door_state current_state = get_door_state();
   if (state != current_state && state != DOOR_UNKNOWN && state != DOOR_ERROR)
   {
     while (current_state != state)
@@ -88,11 +88,11 @@ door_state set_door_state(door_state state)
           break;
 
         case DOOR_CLOSED:
-          door_closed();
+          door_close();
           break;
       }
     
-      current_state = get_door_State();
+      current_state = get_door_state();
     }
   }
 
