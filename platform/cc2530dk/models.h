@@ -63,7 +63,14 @@
  * USB Dongle LEDs
  *  1: P0_0 (Red)
  *  2: P1_1 (Green - active: low)
+ *
+ * ZB502 LEDS
+ *  1: P1_0 (Red)
+ *  2: P1_1 (Red)
+ *  3: P1_4 (Red)
+ *
  */
+
 #if MODEL_CC2531
 #define MODEL_STRING "TI cc2531 USB Dongle\n"
 #define USB_CONF_ENABLE 1
@@ -96,8 +103,13 @@
 
 #elif MODEL_ZB502
 #define MODEL_STRING "Waveshare ZB502\n"
-#define LEDS_GREEN    1
-#define LEDS_RED      2
+#define LED_RED1     1
+#define LED_RED2     2
+#define LED_RED3     4
+/* required by core */
+#define LEDS_RED      1
+#define LEDS_GREEN    2
+#define LEDS_YELLOW   4
 
 /* H/W Connections */
 #define LED1_PIN   P1_0
