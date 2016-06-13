@@ -10,6 +10,7 @@
 #define DOOR_SENSOR_BOTTOM_PIN P0_7
 #define DOOR_SENSOR_BOTTOM_MASK 0x80
 
+/* Active-low inputs */
 typedef enum {
   DOOR_UNKNOWN,
   DOOR_CLOSED,

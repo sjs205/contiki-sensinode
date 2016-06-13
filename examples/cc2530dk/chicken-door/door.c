@@ -70,7 +70,7 @@ void door_stop()
 
 door_state get_door_state()
 {
-  return DOOR_SENSOR_TOP_PIN || (DOOR_SENSOR_BOTTOM_PIN << 1);
+  return !DOOR_SENSOR_BOTTOM_PIN | (!DOOR_SENSOR_TOP_PIN << 1);
 }
 
 door_state set_door_state(door_state state)
