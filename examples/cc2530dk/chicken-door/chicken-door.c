@@ -66,7 +66,7 @@
 
 #include "dev/button-sensor.h"
 
-#define ADC_SENSORS_ON 0
+#define ADC_SENSORS_ON      0
 #if ADC_SENSORS_ON
 #include "dev/adc-sensor.h"
 #endif
@@ -96,6 +96,9 @@ AUTOSTART_PROCESSES(&ctrl_buttons_process);
 PROCESS_THREAD(ctrl_buttons_process, ev, data)
 {
   struct sensors_sensor *sensor;
+#if DOOR_OPEN_OVERRUN || DOOR_CLOSE_OVERRUN
+  static struct etimer et;
+#endif
 
   PROCESS_BEGIN();
 
@@ -105,31 +108,53 @@ PROCESS_THREAD(ctrl_buttons_process, ev, data)
 
     PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event);
 
+    /* Setup */
+    leds_off(LED_RED1);
+
     /* If we woke up after a sensor event, inform what happened */
     sensor = (struct sensors_sensor *)data;
+
+    /* Up button */
     if(sensor == &button_1_sensor) {
-      PRINTF("Button 1 Press\n");
-      leds_toggle(LEDS_GREEN);
-
+      leds_on(LED_RED2);
       door_open();
-      while (button_1_sensor.value(0)) {
-        PRINTF("Door opening\n");
+      PRINTF("Door opening\n");
+
+      while (button_1_sensor.value(0) && get_door_state() != DOOR_OPEN) {
         watchdog_periodic();
       }
-      door_stop();
+
+#if DOOR_OPEN_OVERRUN
+      if (get_door_state() == DOOR_OPEN) {
+        leds_on(LED_RED1);
+        etimer_set(&et, CLOCK_SECOND * DOOR_OPEN_OVERRUN);
+        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+      }
+#endif
     }
 
+    /* Down button */
     if(sensor == &button_2_sensor) {
-      PRINTF("Button 2 Press\n");
-      leds_toggle(LEDS_RED);
-
+      leds_on(LED_RED2);
       door_close();
-      while (button_2_sensor.value(0)) {
-        PRINTF("Door closing\n");
-        watchdog_periodic();
+      PRINTF("Door closing\n");
+
+      while (button_2_sensor.value(0) && get_door_state() != DOOR_CLOSED) {
+          watchdog_periodic();
       }
-      door_stop();
+
+#if DOOR_CLOSE_OVERRUN
+      if (get_door_state() == DOOR_CLOSED) {
+        leds_on(LED_RED1);
+        etimer_set(&et, CLOCK_SECOND * DOOR_CLOSE_OVERRUN);
+        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+      }
+#endif
     }
+
+    /* Finish iteration */
+    door_stop();
+    leds_off(LED_RED2);
   }
 
   PROCESS_END();
