@@ -16,6 +16,7 @@
 #include "dev/button-sensor.h"
 #include "dev/adc-sensor.h"
 #include "dev/leds-arch.h"
+#include "dev/onewire.h"
 #include "net/rime.h"
 #include "net/netstack.h"
 #include "net/mac/frame802154.h"
@@ -160,6 +161,10 @@ main(void) CC_NON_BANKED
 
 #if DMA_ON
   dma_init();
+#endif
+
+#if ONEWIRE_ON
+  onewire_init();
 #endif
 
   io_arch_init();

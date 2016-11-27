@@ -8,7 +8,7 @@ CONTIKI_TARGET_DIRS = . dev
 CONTIKI_TARGET_MAIN = $(addprefix $(OBJECTDIR)/,contiki-main.rel)
 
 CONTIKI_TARGET_SOURCEFILES = contiki-main.c
-CONTIKI_TARGET_SOURCEFILES += leds.c leds-arch.c
+CONTIKI_TARGET_SOURCEFILES += leds.c leds-arch.c onewire.c
 CONTIKI_TARGET_SOURCEFILES += sensors.c smartrf-sensors.c
 CONTIKI_TARGET_SOURCEFILES += button-sensor.c adc-sensor.c
 CONTIKI_TARGET_SOURCEFILES += serial-line.c slip-arch.c slip.c
