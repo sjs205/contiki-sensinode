@@ -43,6 +43,8 @@
 #include "cc253x.h"
 #include "sys/energest.h"
 
+#include "rtimer_clock.h"
+
 /* Sleep timer runs on the 32k RC osc. */
 /* One clock tick is 7.8 ms */
 #define TICK_VAL (32768/128)  /* 256 */
@@ -50,9 +52,6 @@
 #if CLOCK_CONF_STACK_FRIENDLY
 volatile uint8_t sleep_flag;
 #endif
-/*---------------------------------------------------------------------------*/
-/* Do NOT remove the absolute address and do NOT remove the initialiser here */
-__xdata __at(0x0000) static unsigned long timer_value = 0;
 
 static volatile CC_AT_DATA clock_time_t count = 0; /* Uptime in ticks */
 static volatile CC_AT_DATA clock_time_t seconds = 0; /* Uptime in secs */
@@ -119,7 +118,7 @@ clock_init(void)
   CLKCONCMD |= CLKCONCMD_TICKSPD2 | CLKCONCMD_TICKSPD1;
   while(CLKCONSTA != CLKCONCMD);
 
-  /* Initialize tick value */
+  /* Initialize tick value
   timer_value = ST0;
   timer_value += ((unsigned long int)ST1) << 8;
   timer_value += ((unsigned long int)ST2) << 16;
@@ -128,31 +127,14 @@ clock_init(void)
   ST1 = (unsigned char)(timer_value >> 8);
   ST0 = (unsigned char)timer_value;
 
+  STIE = 1; *//* IEN0.STIE interrupt enable */
   STIE = 1; /* IEN0.STIE interrupt enable */
 }
 /*---------------------------------------------------------------------------*/
-/* avoid referencing bits, we don't call code which use them */
-#pragma save
-#if CC_CONF_OPTIMIZE_STACK_SIZE
-#pragma exclude bits
-#endif
 void
-clock_isr(void) __interrupt(ST_VECTOR)
+clock_isr(void)
 {
   DISABLE_INTERRUPTS();
-  ENERGEST_ON(ENERGEST_TYPE_IRQ);
-
-  /*
-   * Read value of the ST0:ST1:ST2, add TICK_VAL and write it back.
-   * Next interrupt occurs after the current time + TICK_VAL
-   */
-  timer_value = ST0;
-  timer_value += ((unsigned long int)ST1) << 8;
-  timer_value += ((unsigned long int)ST2) << 16;
-  timer_value += TICK_VAL;
-  ST2 = (unsigned char)(timer_value >> 16);
-  ST1 = (unsigned char)(timer_value >> 8);
-  ST0 = (unsigned char)timer_value;
 
   ++count;
 
@@ -177,9 +159,5 @@ clock_isr(void) __interrupt(ST_VECTOR)
   }
 #endif
 
-  STIF = 0; /* IRCON.STIF */
-  ENERGEST_OFF(ENERGEST_TYPE_IRQ);
-  ENABLE_INTERRUPTS();
 }
-#pragma restore
 /*---------------------------------------------------------------------------*/

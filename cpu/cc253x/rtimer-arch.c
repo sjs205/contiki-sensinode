@@ -52,11 +52,21 @@
 #include "cc253x.h"
 #include "sys/energest.h"
 
+#include "dev/rtimer_clock.h"
+
 #include "debug.h"
 #include <stdio.h>
 
-#define RT_MODE_COMPARE() do { T1CCTL1 |= T1CCTL_MODE; } while(0)
-#define RT_MODE_CAPTURE() do { T1CCTL1 &= ~T1CCTL_MODE; } while(0)
+/* Sleep timer runs on the 32k RC osc. */
+/* One clock tick is 7.8 ms */
+#define CLOCK_TICK_VAL (32768/128)  /* 256 */
+#define RTIMER_TICK_VAL 64  /* Freq ~16384Hz */
+/*---------------------------------------------------------------------------*/
+/* Do NOT remove the absolute address and do NOT remove the initialiser here */
+__xdata __at(0x0000) static unsigned long timer_value = 0;
+/*---------------------------------------------------------------------------*/
+static volatile CC_AT_DATA clock_time_t rtimer_ticks = 0; /* Uptime in ticks */
+static volatile CC_AT_DATA uint8_t clock_sub_ticks = 0;   /* clock sub-ticks */
 /*---------------------------------------------------------------------------*/
 void
 rtimer_arch_init(void)
@@ -67,33 +77,31 @@ rtimer_arch_init(void)
    *   Tick Speed has been prescaled to 500 kHz already in clock_init()
    *   We further prescale by 32 resulting in 15625 Hz for this timer.
    */
-  T1CTL = (T1CTL_DIV1 | T1CTL_MODE0);
+  /* Initialize tick value */
+  /* Initial rtimer delay = 15625. Therefore, ~32768/2 */
+  timer_value = ST0;
+  timer_value += ((unsigned long int)ST1) << 8;
+  timer_value += ((unsigned long int)ST2) << 16;
+  timer_value += RTIMER_TICK_VAL;
+  ST2 = (unsigned char)(timer_value >> 16);
+  ST1 = (unsigned char)(timer_value >> 8);
+  ST0 = (unsigned char)timer_value;
 
-  T1STAT = 0;
-
-  /* Timer 1, Channel 1. Compare Mode (0x04), Interrupt mask on (0x40) */
-  T1CCTL1 = T1CCTL_MODE | T1CCTL_IM;
-
-  /* Interrupt Mask Flags: No interrupt on overflow */
-  OVFIM = 0;
-
-  /* Acknowledge Timer 1 Interrupts */
-  T1IE = 1;
+  STIE = 1; /* IEN0.STIE interrupt enable */
 }
 /*---------------------------------------------------------------------------*/
 void
 rtimer_arch_schedule(rtimer_clock_t t)
 {
-  /* Switch to capture mode before writing T1CC1x and
-   * set the compare mode values so we can get an interrupt after t */
-  RT_MODE_CAPTURE();
-  T1CC1L = (unsigned char)t;
-  T1CC1H = (unsigned char)(t >> 8);
-  RT_MODE_COMPARE();
+  timer_value = ST0;
+  timer_value += ((unsigned long int)ST1) << 8;
+  timer_value += ((unsigned long int)ST2) << 16;
+  timer_value += RTIMER_TICK_VAL;
+  ST2 = (unsigned char)(timer_value >> 16);
+  ST1 = (unsigned char)(timer_value >> 8);
+  ST0 = (unsigned char)timer_value;
 
-  /* Turn on compare mode interrupt */
-  T1STAT = 0;
-  T1CCTL1 |= T1CCTL_IM;
+  STIE = 1; /* IEN0.STIE interrupt enable */
 }
 /*---------------------------------------------------------------------------*/
 /* avoid referencing bits, we don't call code which use them */
@@ -102,18 +110,47 @@ rtimer_arch_schedule(rtimer_clock_t t)
 #pragma exclude bits
 #endif
 void
-rtimer_isr(void) __interrupt(T1_VECTOR)
+rtimer_isr(void) __interrupt(ST_VECTOR)
 {
-  T1IE = 0; /* Ignore Timer 1 Interrupts */
+  DISABLE_INTERRUPTS();
   ENERGEST_ON(ENERGEST_TYPE_IRQ);
 
-  /* No more interrupts from Channel 1 till next rtimer_arch_schedule() call */
-  T1STAT &= ~T1STAT_CH1IF;
-  T1CCTL1 &= ~T1CCTL_IM;
+  /*
+   * Read value of the ST0:ST1:ST2, add TICK_VAL and write it back.
+   * Next interrupt occurs after the current time + TICK_VAL
+   */
+  timer_value = ST0;
+  timer_value += ((unsigned long int)ST1) << 8;
+  timer_value += ((unsigned long int)ST2) << 16;
+  timer_value += RTIMER_TICK_VAL;
+  ST2 = (unsigned char)(timer_value >> 16);
+  ST1 = (unsigned char)(timer_value >> 8);
+  ST0 = (unsigned char)timer_value;
 
-  rtimer_run_next();
+  ++rtimer_ticks;
 
+  /* two cycles every interrupt */
+  if (++clock_sub_ticks <= 128) {
+    clock_sub_ticks = 0;
+    /* trigger clock */
+    clock_isr();
+  }
+
+  /*
+#if CLOCK_CONF_STACK_FRIENDLY
+  sleep_flag = 1;
+#else
+  if(etimer_pending()
+      && (etimer_next_expiration_time() - count - 1) > MAX_TICKS) {
+    etimer_request_poll();
+  }
+#endif
+*/
+  STIF = 1; /* IRCON.STIF */
   ENERGEST_OFF(ENERGEST_TYPE_IRQ);
-  T1IE = 1; /* Acknowledge Timer 1 Interrupts */
+  ENABLE_INTERRUPTS();
 }
 #pragma restore
+unsigned long get_rtimer_val() {
+  return rtimer_ticks;
+}
